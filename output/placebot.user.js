@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         r/placeDE Zinnsoldat
+// @name         r/placeBR Zinnsoldat
 // @namespace    http://tampermonkey.net/
-// @version      0.4
+// @version      0.1
 // @description  Einer von uns!
 // @author       placeDE Devs
 // @match        https://*.reddit.com/r/place/*
@@ -10,10 +10,16 @@
 // @downloadURL  https://github.com/PlaceDE-Official/zinnsoldat/raw/main/output/placebot.user.js
 // ==/UserScript==
 (async () => {
+    // Constantes para usar por aí
+    const botVersion = "0.1";
+    const botName = "14-Bis";
+    const urlTemplateJson = "https://raw.githubusercontent.com/PakuPacu/json-r-place-brazil/main/brasil.json";
+    const urlBotInfo = "https://raw.githubusercontent.com/gastk/placeBR-14bis/main/output/jsons/botInfo.json";
+
+
     // Check for correct page
-    if (!window.location.href.startsWith('https://www.reddit.com/r/place/') && !window.location.href.startsWith('https://new.reddit.com/r/place/')) {
+    if (!window.location.href.startsWith('https://www.reddit.com/r/place/') && !window.location.href.startsWith('https://new.reddit.com/r/place/'))
         return;
-    }
 
     // Check for marker; only load the script once!
     if (document.head.querySelector('meta[name="zinnsoldat"]')) {
@@ -59,13 +65,13 @@
     `;
     document.head.appendChild(zs_style);
 
-    let zs_running = true;
-    let zs_initialized;
+    let bis_running = false;
     let placeTimeout;
+    let canvasFound = false;
 
     const zs_version = "0.4";
     const zs_startButton = document.createElement('button');
-    zs_startButton.innerText = `Zinnsoldat v${zs_version}`;
+    zs_startButton.innerText = `${botName} v${zs_version}`;
     zs_startButton.classList.add('zs-pixeled', 'zs-button', 'zs-stopbutton');
     zs_startButton.style.setProperty('--zs_timeout', '100%');
     document.body.appendChild(zs_startButton);
@@ -151,7 +157,7 @@
     }
     const zs_updateNotification = () => {
         Toastify({
-            text: 'Neue Version auf https://place.army/ verfügbar!',
+            text: `Nova versão do ${botName} disponível em: https://place.army/`,
             destination: 'https://place.army/',
             duration: -1,
             gravity: 'bottom',
@@ -166,7 +172,7 @@
         }).showToast();
     }
 
-    zs_info('Einer von uns!');
+    zs_info('Bora voar!');
 
     // Override setTimeout to allow getting the time left
     const _setTimeout = setTimeout; 
@@ -216,9 +222,9 @@
     
         return responseText.match(/"accessToken":"(\\"|[^"]*)"/)[1];
     }
-    zs_info('Erbitte Reddit um Zugriff...');
+    zs_info('Solicitando autorização do Reddit...');
     let zs_accessToken = await zs_getAccessToken();
-    zs_success('Zugriff gewährt!');
+    zs_success('Acesso autorizado!');
 
     const zs_getCanvasId = (x, y) => {
         if (y < 0 && x < -500) {
@@ -246,8 +252,8 @@
         return zs_getCanvasId(x, y) < 3 ? y + 1000 : y;
     }
 
-    const zs_placePixel = async (x, y, color) => {
-        console.log('Trying to place pixel at %s, %s in %s', x, y, color);
+    async function zs_placePixel(x, y, color) {
+        console.log('Tentando adicionar um pixel: %s, %s in %s', x, y, color);
         const response = await fetch('https://gql-realtime-2.reddit.com/query', {
             method: 'POST',
             body: JSON.stringify({
@@ -302,127 +308,364 @@
         if (data.errors !== undefined) {
             if (data.errors[0].message === 'Ratelimited') {
                 console.log('Could not place pixel at %s, %s in %s - Ratelimit', x, y, color);
-                zs_warn('Du hast noch Abklingzeit!');
+                zs_warn('O tempo de espera ainda não acabou!');
                 return data.errors[0].extensions?.nextAvailablePixelTs;
             }
             console.log('Could not place pixel at %s, %s in %s - Response error', x, y, color);
             console.error(data.errors);
-            zs_error('Fehler beim Platzieren des Pixels');
+            zs_error('Erro ao adicionar um pixel');
             return null;
         }
         console.log('Did place pixel at %s, %s in %s', x, y, color);
-        zs_success(`Pixel (${x}, ${y}) platziert!`);
+        zs_success(`Pixel (${x}, ${y}) adicionado!`);
         return data?.data?.act?.data?.[0]?.data?.nextAvailablePixelTimestamp;
     }
 
+    // const zs_initCarpetbomberConnection = () => {
+    //     c2 = new WebSocket("wss://carpetbomber.place.army");
 
-    let c2;
-    let tokens = ['Wololo']; // We only have one token
+    //     c2.onopen = () => {
+    //         zs_initialized = true;
+    //         zs_info(`Conectando-se a "${serverName.toLowerCase()}"...`);
+    //         c2.send(JSON.stringify({ type: "Handshake", version: zs_version }));
+    //         zs_requestJob();
+    //         setInterval(() => c2.send(JSON.stringify({ type: "Wakeup"})), 40*1000);
+    //     }
+        
+    //     c2.onerror = (error) => {
+    //         zs_error(`A conexão com a ${serverName.toLowerCase()} falhou! Tentando novamente em 5s`);
+    //         console.error(error);
+    //         setTimeout(zs_initCarpetbomberConnection, 5000);
+    //     }
 
-    const zs_requestJob = () => {
-        if (c2.readyState !== c2.OPEN) {
-            zs_error('Verbindung zum "Carpetbomber" abgebrochen. Verbinde...');
-            zs_initCarpetbomberConnection();
-            return;
+    //     c2.onmessage = (event) => {
+    //         data = JSON.parse(event.data)
+    //         // console.log('received: %s', JSON.stringify(data));
+
+    //         if (data.type === 'UpdateVersion') {
+    //             zs_success('Atualizado com sucesso');
+    //             if (data.version > zs_version) {
+    //                 zs_updateNotification();
+    //             }
+    //         } else if (data.type == "Jobs") {
+    //             zs_processJobResponse(data.jobs);
+    //         }
+    //     }
+    // }
+    
+    // zs_initCarpetbomberConnection();
+
+    zs_startButton.onclick = async () => {
+        if (bis_running) {
+            bis_PararBot();
+        } else {
+            await bis_IniciarBot();
         }
-        if (!zs_running) {
-            return;
-        }
-        c2.send(JSON.stringify({ type: "RequestJobs", tokens: tokens }));
     }
 
-    const zs_processJobResponse = (jobs) => {
-        if (!jobs || jobs === {}) {
-            zs_warn('Kein verfügbarer Auftrag. Versuche in 60s erneut');
+
+
+
+
+
+
+
+    //------- Códigos novos
+
+    // Variáveis:
+    let objJsonTemplates; // Json com os templates
+    let canvaContext;
+
+    const _listaCores = [
+        { cor: undefined, id: 1 },  // dark red
+        { cor: "FF4500", id: 2 },  // red
+        { cor: "FFA800", id: 3 },  // orange
+        { cor: "FFD635", id: 4 },  // yellow
+        { cor: undefined, id: 5 },  // pale yellow
+        { cor: "00A368", id: 6 },  // dark green
+        { cor: undefined, id: 7 },  // green
+        { cor: "7EED56", id: 8 },  // light green
+        { cor: undefined, id: 9 },  // dark teal
+        { cor: undefined, id: 10 }, // teal
+        { cor: undefined, id: 11 }, // light teal
+        { cor: "2450A4", id: 12 }, // dark blue
+        { cor: "3690EA", id: 13 }, // blue
+        { cor: "51E9F4", id: 14 }, // light blue
+        { cor: undefined, id: 15 }, // indigo
+        { cor: undefined, id: 16 }, // periwinkle
+        { cor: undefined, id: 17 }, // lavender
+        { cor: "811E9F", id: 18 }, // dark purple
+        { cor: "B44AC0", id: 19 }, // purple
+        { cor: undefined, id: 20 }, // pale purple
+        { cor: undefined, id: 21 }, // magenta
+        { cor: undefined, id: 22 }, // pink
+        { cor: "FF99AA", id: 23 }, // light pink
+        { cor: undefined, id: 24 }, // dark brown
+        { cor: "9C6926", id: 25 }, // brown
+        { cor: undefined, id: 26 }, // beige
+        { cor: "000000", id: 27 }, // black
+        { cor: undefined, id: 28 }, // dark gray
+        { cor: "898D90", id: 29 }, // gray
+        { cor: "D4D7D9", id: 30 }, // light gray
+        { cor: "E9EBED", id: 31 }, // white
+    ];      
+      
+    const sleep = ms => new Promise(res => setTimeout(res, ms));
+
+    async function GetJson(url) {
+        try
+        {
+            const response = await fetch(url);
+            if (!response?.ok) 
+                throw new Error("Falha ao obter o JSON");
+            else
+                return response.json();
+        }
+        catch
+        {
+            // Se der erro não faz nada porque to com preguiça. Nem sei se isso funciona KKKKK
+            throw new Error("Falha ao obter o JSON");
+        }
+    }
+
+    async function CarregarAsCoisasBasicas() {
+        try
+        {
+            const objBotInfo = await GetJson(urlBotInfo);
+            if (objBotInfo.versaoHabilitada != botVersion)
+                throw new Error("Versão incompatível. Atualize a versão do bot!");
+    
+            objJsonTemplates = await GetJson(urlTemplateJson);
+            ChecaSeObjetoValido(objJsonTemplates);
+    
+            const encontrado = objJsonTemplates.templates[0];
+            encontrado.imagemBitmap = await ObterImagemBitmapUrl(encontrado.sources[0]);
+    
+            return;
+        }
+        catch (error)
+        {
+            zs_error("Erro:", error)
+        }
+    }
+
+    function ChecaSeObjetoValido(obj) {
+        if (!obj?.templates)
+            throw new Error("Falha ao carregar o template");
+        else if (!Array.isArray(obj.templates) || obj.templates.length == 0 || obj.templates.length > 1)
+            throw new Error("Falha ao carregar o template: Nenhum template ou muitas templates (ainda não suportados)");
+        else if (!Array.isArray(obj.templates[0].sources) || obj.templates[0].sources.length == 0 || obj.templates[0].sources.length > 1)
+            throw new Error("Falha ao carregar o template: Nenhuma fonte ou muitas fontes (ainda não suportados)");
+        else if (!obj.templates[0]?.x)
+            throw new Error("Falha ao carregar o template");
+        else if (!obj.templates[0]?.y)
+            throw new Error("Falha ao carregar o template");
+    }
+
+    async function ObterImagemBitmapUrl(url) {
+        try {
+            return await BaixarImagemUrl(url);
+        } catch (error) {
+            throw new Error('Erro:', error);
+        }
+    }
+
+    //#region Funções da imagem do template
+
+    async function BaixarImagemUrl(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok)
+                return null;
+        
+            // Converte a resposta para um blob e, em seguida, cria um ImageBitmap
+            const blob = await response.blob();
+            const imageBitmap = await createImageBitmap(blob);
+        
+            return imageBitmap;
+        } catch (error) {
+            throw new Error('Erro ao carregar a imagem:', error);
+        }
+    }
+
+    function ObterPixelAleatorioImagem(imageBitmap) {
+        const canvas = new OffscreenCanvas(imageBitmap.width, imageBitmap.height);
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imageBitmap, 0, 0);
+      
+        // Gerar coordenadas X e Y aleatórias dentro dos limites da imagem
+        const randomX = Math.floor(Math.random() * imageBitmap.width);
+        const randomY = Math.floor(Math.random() * imageBitmap.height);
+      
+        // Obter o objeto de dados da imagem e, em seguida, a cor do pixel nas coordenadas aleatórias
+        const pixelData = ctx.getImageData(randomX, randomY, 1, 1).data;
+        const [r, g, b, a] = pixelData;
+        const hex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+      
+        return {
+          x: randomX,
+          y: randomY,
+          color: hex,
+        };
+    }
+
+    async function PegarPixelParaPintar(objTemplate) {
+        try
+        {
+            let pixel = undefined;
+            let tentativas = 0;
+            while (pixel === undefined) {
+                if (tentativas > 50) {
+                    pixel = null;
+                }
+                else
+                {
+                    tentativas++;
+                    const objPixel = ObterPixelAleatorioImagem(objTemplate.imagemBitmap);
+                    objPixel.x += objTemplate.x;
+                    objPixel.y += objTemplate.y;
+
+                    const podePintar = await ChecaSePodePintarCanvas(objPixel);
+                    if (podePintar) {
+                        const corReddit = ConverteCorParaReddit(objPixel.cor);
+                        objPixel.cor = corReddit;
+
+                        pixel = objPixel;
+                    }
+                }
+            }
+
+            return pixel;
+        }
+        catch (error)
+        {
+            return { "x": null, "y": null, "cor": null};
+        }
+    }
+
+    async function ChecaSePodePintarCanvas(objPixel) {
+        while (document.readyState !== 'complete') {
+            console.log("Template manager sleeping for 1 second because document isn't ready yet.");
+            await sleep(1000);
+        }
+
+        let tentativas = 0;
+        let tentativasMaximas = 50;
+        while (canvaContext == undefined) {
+            await sleep(1000);
+            tentativas++;
+            if (tentativas > tentativasMaximas) {
+                canvaContext = null;
+                return;
+            }
+            
+            findElementOfType(document.documentElement, HTMLCanvasElement);
+        }
+        const pixelCanvaData = canvaContext.getImageData(objPixel.x, objPixel.y, 1, 1).data;
+        const [r, g, b, a] = pixelCanvaData;
+        const hex = ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0');
+
+        return objPixel.cor.toUpperCase() == hex.toUpperCase();
+    }
+
+    function ConverteCorParaReddit(cor) {
+        const corReddit = _listaCores.find(e => e.cor == cor);
+
+        if (corReddit)
+            return corReddit.id;
+        else
+            throw new Error("Cor não identificada");
+    }
+
+    //#endregion Funções da imagem do template
+
+    function findElementOfType(element, type) {
+        let rv = [];
+        if (element instanceof type || (element?.innerHtml && element.innerHTML.includes('</canvas>'))) {
+            console.log('found canvas', element, window.location.href);
+            rv.push(element);
+            canvaContext = element.getContext('2d');
+        }
+        // find in Shadow DOM elements
+        if (element instanceof HTMLElement && element.shadowRoot) {
+            rv.push(...findElementOfType(element.shadowRoot, type));
+        }
+        // find in children
+        for (let c = 0; c < element.children.length; c++) {
+            rv.push(...findElementOfType(element.children[c], type));
+        }
+        return rv;
+    }
+
+    async function ExecutarBot(objTemplate) {
+        if (!objTemplate || objTemplate === {}) {
+            zs_warn('Nenhum template disponível. Tente novamente em 60s');
             clearTimeout(placeTimeout);
-            placeTimeout = setTimeout(() => {
-                zs_requestJob();
+            placeTimeout = setTimeout(async () => {
+                await bis_IniciarBot();
             }, 60000);
             return;
         }
-        let [token, [job, code]] = Object.entries(jobs)[0];
-        if (!job) {
-            // Check if ratelimited and schedule retry
-            const ratelimit = code?.Ratelimited?.until;
-            if (ratelimit) {
-                clearTimeout(placeTimeout);
-            placeTimeout = setTimeout(() => {
-                    zs_requestJob();
-                }, Math.max(5000, Date.parse(ratelimit) + 2000 - Date.now()));
-                return;
-            }
-            // Other error. No jobs left?
-            zs_warn('Kein verfügbarer Auftrag. Versuche in 20s erneut');
+
+        const pixel = await PegarPixelParaPintar(objTemplate.templates[0]); // Retorna {x, y, cor}
+
+        if (!pixel?.cor) {
+            zs_error('Falha ao pegar a cor do pixel');
             clearTimeout(placeTimeout);
-            placeTimeout = setTimeout(() => {
-                zs_requestJob();
+            placeTimeout = setTimeout(async () => {
+                await bis_IniciarBot();
             }, 20000);
             return;
         }
+
         // Execute job
-        zs_placePixel(job.x, job.y, job.color - 1).then((nextTry) => {
+        const ret = await zs_placePixel(pixel.x, pixel.y, pixel.cor - 1)
+
+        clearTimeout(placeTimeout);
+        placeTimeout = setTimeout(async () => {
+            await bis_IniciarBot();
+        }, Math.max(20000, (ret || 5*60*1000) + 2000 - Date.now()));
+    }
+
+    async function bis_IniciarBot() {
+        debugger;
+
+        try
+        {
+            if (bis_running)
+                return false;
+
+            bis_running = true;
+            zs_startButton.classList.remove('zs-startbutton');
+            zs_startButton.classList.add('zs-stopbutton');
+            await sleep(5000);
+
+            await CarregarAsCoisasBasicas();
+            await ExecutarBot(objJsonTemplates);
+            bis_running = false;
+        }
+        catch (error)
+        {
+            bis_running = false;
+            console.error(`${botName} bot error:`, error);
+            zs_error("Erro desconhecido na execução do bot. Tentando novamente em 20 segundos.")
             clearTimeout(placeTimeout);
-            placeTimeout = setTimeout(() => {
-                zs_requestJob();
-            }, Math.max(5000, (nextTry || 5*60*1000) + 2000 - Date.now()));
-        });
-    }
-
-    const zs_initCarpetbomberConnection = () => {
-        c2 = new WebSocket("wss://carpetbomber.place.army");
-
-        c2.onopen = () => {
-            zs_initialized = true;
-            zs_info('Verbinde mit "Carpetbomber"...');
-            c2.send(JSON.stringify({ type: "Handshake", version: zs_version }));
-            zs_requestJob();
-            setInterval(() => c2.send(JSON.stringify({ type: "Wakeup"})), 40*1000);
-        }
-        
-        c2.onerror = (error) => {
-            zs_error('Verbindung zum "Carpetbomber" fehlgeschlagen! Versuche in 5s erneut');
-            console.error(error);
-            setTimeout(zs_initCarpetbomberConnection, 5000);
-        }
-
-        c2.onmessage = (event) => {
-            data = JSON.parse(event.data)
-            // console.log('received: %s', JSON.stringify(data));
-
-            if (data.type === 'UpdateVersion') {
-                zs_success('Verbindung aufgebaut!');
-                if (data.version > zs_version) {
-                    zs_updateNotification();
-                }
-            } else if (data.type == "Jobs") {
-                zs_processJobResponse(data.jobs);
-            }
-        }
-    }
-    
-    zs_initCarpetbomberConnection();
-
-    const zs_startBot = () => {
-        zs_running = true;
-        zs_startButton.classList.remove('zs-startbutton');
-        zs_startButton.classList.add('zs-stopbutton');
-        if (zs_initialized) {
-            zs_requestJob();
+            placeTimeout = setTimeout(async () => {
+                await bis_IniciarBot();
+            }, 20000);
         }
     }
 
-    const zs_stopBot = () => {
-        zs_running = false;
+    const bis_PararBot = () => {
+        bis_running = false;
         clearTimeout(placeTimeout);
         zs_startButton.classList.remove('zs-stopbutton');
         zs_startButton.classList.add('zs-startbutton');
     }
 
-    zs_startButton.onclick = () => {
-        if (zs_running) {
-            zs_stopBot();
-        } else {
-            zs_startBot();
-        }
-    }
+
+    // Execuções:
+    zs_info("Iniciando bot...");
+    await bis_IniciarBot();
+
 })();
